@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n on every script
+        run: |
+          for f in scripts/*.sh scripts/test/*.sh; do
+            echo "::group::$f"
+            bash -n "$f" && echo "ok"
+            echo "::endgroup::"
+          done
+      - name: shellcheck (warnings allowed)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          shellcheck -S warning scripts/*.sh scripts/test/*.sh || true
+
+  self-test:
+    runs-on: ubuntu-24.04
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: skill self-test (fixtures: node, python, go, docker)
+        run: bash scripts/test/run.sh
+
+  skill-md-shape:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: SKILL.md has the required frontmatter
+        # Verify the entry point Claude Code loads is well-formed: starts with
+        # YAML frontmatter containing `name:` and `description:`. Otherwise
+        # /skills won't pick it up.
+        run: |
+          python3 - <<'PY'
+          import sys, re
+          src = open('SKILL.md').read()
+          if not src.startswith('---'):
+              sys.exit('SKILL.md must start with --- frontmatter')
+          # split out the frontmatter block
+          parts = src.split('---', 2)
+          if len(parts) < 3:
+              sys.exit('SKILL.md frontmatter not closed with ---')
+          fm = parts[1]
+          for k in ('name:', 'description:'):
+              if k not in fm:
+                  sys.exit(f'SKILL.md frontmatter missing {k}')
+          print('SKILL.md frontmatter OK')
+          PY
+      - name: playbooks referenced by SKILL.md exist on disk
+        run: |
+          python3 - <<'PY'
+          import re, sys, os
+          src = open('SKILL.md').read()
+          refs = set(re.findall(r'\(([^)]+\.md)\)', src))
+          missing = [r for r in refs if r.startswith('playbooks/') and not os.path.exists(r)]
+          if missing:
+              sys.exit('SKILL.md references missing playbooks: ' + ', '.join(missing))
+          print(f'{len(refs)} markdown refs in SKILL.md, all on disk')
+          PY
