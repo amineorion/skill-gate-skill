@@ -22,3 +22,14 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y shellcheck
           shellcheck -S warning scripts/*.sh scripts/test/*.sh || true
+
+  self-test:
+    runs-on: ubuntu-24.04
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: skill self-test
+        run: bash scripts/test/run.sh
