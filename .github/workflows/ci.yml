@@ -33,3 +33,13 @@ jobs:
           python-version: "3.12"
       - name: skill self-test
         run: bash scripts/test/run.sh
+
+  skill-md-shape:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: SKILL.md frontmatter + playbook refs exist
+        run: python3 scripts/test/check_skill_md.py
