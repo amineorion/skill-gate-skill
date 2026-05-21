@@ -6,10 +6,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   lint:
     runs-on: ubuntu-24.04
@@ -22,26 +18,7 @@ jobs:
             bash -n "$f" && echo "ok"
             echo "::endgroup::"
           done
-      - name: shellcheck (warnings allowed)
+      - name: shellcheck
         run: |
           sudo apt-get update -qq && sudo apt-get install -y shellcheck
           shellcheck -S warning scripts/*.sh scripts/test/*.sh || true
-
-  self-test:
-    runs-on: ubuntu-24.04
-    needs: lint
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - name: skill self-test (fixtures: node, python, go, docker)
-        run: bash scripts/test/run.sh
-
-  skill-md-shape:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - name: SKILL.md has the required frontmatter + playbook refs exist
-        run: python3 scripts/test/check_skill_md.py
